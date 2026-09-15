@@ -88,7 +88,7 @@ ACCESOS SOFTRAPPS
 <body>
 
 <div id="sheet-sync-container">
-  <h1>REFERENCIAS TEMAS</h1>
+  <h1>SOFTR APPS</h1>
   <div class="sheet-sync-header">
     <span>Última sincronización: <span id="sheet-sync-time">—</span></span>
     <button id="sheet-sync-refresh">Actualizar ahora</button>
@@ -107,13 +107,13 @@ ACCESOS SOFTRAPPS
 
   // Nombres de encabezado tal como figuran en la fila 1 de la planilla.
   // El código busca estas columnas por nombre, sin importar en qué posición estén.
-  const HEADER_NOMBRE = "Nombre";
-  const HEADER_LINK = "LinkSpotify";
-  const HEADER_YOUTUBE = "linkYoutube";
+  const HEADER_APP = "App";
+  const HEADER_URL = "URL";
+  const HEADER_BD = "Link BasedeDatos Softr";
   const HEADER_ANIO = "Año";
   const HEADER_ALBUM = "Álbum Spotify";
 
-  const HEADER_MOISES = "setlistMoises";
+  const HEADER_STUDIO = "Link Studio.softr.io";
 
   const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&gid=${GID}`;
 
@@ -154,53 +154,53 @@ ACCESOS SOFTRAPPS
       const cols = json.table.cols;
 
       // Ubicación dinámica de columnas por nombre de encabezado
-      const idxNombre = findColIndex(cols, HEADER_NOMBRE);
-      const idxLink = findColIndex(cols, HEADER_LINK);
-      const idxYoutube = findColIndex(cols, HEADER_YOUTUBE);
+      const idxApp = findColIndex(cols, HEADER_APP);
+      const idxURL = findColIndex(cols, HEADER_URL);
+      const idxBD = findColIndex(cols, HEADER_BD);
       const idxAnio = findColIndex(cols, HEADER_ANIO);
       const idxAlbum = findColIndex(cols, HEADER_ALBUM);
 
-      const idxMoises = findColIndex(cols, HEADER_MOISES);
+      const idxStudio = findColIndex(cols, HEADER_STUDIO);
 
-      if (idxNombre === -1 || idxLink === -1) {
-        statusEl.textContent = `No se encontraron las columnas "${HEADER_NOMBRE}" y/o "${HEADER_LINK}" en la planilla.`;
+      if (idxApp === -1 || idxURL === -1) {
+        statusEl.textContent = `No se encontraron las columnas "${HEADER_APP}" y/o "${HEADER_URL}" en la planilla.`;
         return;
       }
 
       listEl.innerHTML = rows
-        .filter(r => cellValue(r, idxNombre) && cellValue(r, idxLink)) // exige al menos Nombre y Link
+        .filter(r => cellValue(r, idxApp) && cellValue(r, idxURL)) // exige al menos Nombre y Link
         .map(r => {
-          const nombreRaw = cellValue(r, idxNombre);
-          const linkRaw = cellValue(r, idxLink);
-          const youtubeRaw = cellValue(r, idxYoutube);
+          const appRaw = cellValue(r, idxApp);
+          const urlRaw = cellValue(r, idxUrl);
+          const bdRaw = cellValue(r, idxBd);
           const anioRaw = cellValue(r, idxAnio) || EMPTY_PLACEHOLDER;
           const albumRaw = cellValue(r, idxAlbum) || EMPTY_PLACEHOLDER;
           const esAlbumLink = /^https?:\/\//i.test(albumRaw);
 
-          const moisesRaw = cellValue(r, idxMoises) || EMPTY_PLACEHOLDER;
+          const studioRaw = cellValue(r, idxStudio) || EMPTY_PLACEHOLDER;
 
-          const esMoisesLink = /^https?:\/\//i.test(moisesRaw);
+          const esStudioLink = /^https?:\/\//i.test(studioRaw);
 
       
-          const nombre = escapeHtml(nombreRaw);
-          const link = escapeHtml(linkRaw);
-          const youtube = escapeHtml(youtubeRaw);
+          const app = escapeHtml(appRaw);
+          const url = escapeHtml(urlRaw);
+          const bd = escapeHtml(bdRaw);
           const anio = escapeHtml(anioRaw);
           const album = escapeHtml(albumRaw);
-          const moises = escapeHtml(moisesRaw);
+          const studio = escapeHtml(studioRaw);
           
 
           return `
             <div class="record">
-              <a href="${link}" target="_blank" rel="noopener">${nombre}</a>
-              <span class="raw-url">"${link}"</span>
-              <!-- <a href="${youtube}" target="_blank" rel="noopener">${nombre}</a> -->
-              <span class="extra-field"><strong>Youtube: </strong><a href="${youtube}" target="_blank" rel="noopener">${nombre}</a></span>
+              <a href="${url}" target="_blank" rel="noopener">${app}</a>
+              <span class="raw-url">"${url}"</span>
+              <!-- <a href="${bd}" target="_blank" rel="noopener">${app}</a> -->
+              <span class="extra-field"><strong>Youtube: </strong><a href="${bd}" target="_blank" rel="noopener">${app}</a></span>
               
               <span class="extra-field"><strong>Año:</strong> ${anio}</span>
               <span class="extra-field"><strong>Álbum Spotify:</strong> ${esAlbumLink ? `<a href="${album}" target="_blank" rel="noopener">${album}</a>` : album}</span>
 
-              <span class="extra-field"><strong>Setlist Moises: </strong>${esMoisesLink ? `<a href="${moises}" target="_blank" rel="noopener">Abrir Setlist en app Moises.ai</a>` : moises}</span>
+              <span class="extra-field"><strong>Setlist Moises: </strong>${esStudioLink ? `<a href="${studio}" target="_blank" rel="noopener">Abrir Setlist en app Moises.ai</a>` : moises}</span>
               
               <br>
             </div>`;
