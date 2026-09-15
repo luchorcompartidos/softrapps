@@ -168,7 +168,7 @@ ACCESOS SOFTRAPPS
       }
 
       listEl.innerHTML = rows
-        .filter(r => cellValue(r, idxApp) && cellValue(r, idxURL)) // exige al menos Nombre y Link
+        .filter(r => cellValue(r, idxNombre) && cellValue(r, idxLink)) // exige al menos Nombre y Link
         .map(r => {
           const nombreRaw = cellValue(r, idxNombre);
           const linkRaw = cellValue(r, idxLink);
