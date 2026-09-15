@@ -115,6 +115,9 @@ ACCESOS SOFTRAPPS
 
   const HEADER_STUDIO = "Link Studio.softr.io";
 
+  const HEADER_ESTADO = "Estado";
+  
+
   const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&gid=${GID}&headers=1`;
 
   const statusEl = document.getElementById("sheet-sync-status");
@@ -162,6 +165,9 @@ ACCESOS SOFTRAPPS
 
       const idxStudio = findColIndex(cols, HEADER_STUDIO);
 
+      const idxEstado = findColIndex(cols, HEADER_ESTADO);
+
+      
       if (idxApp === -1 || idxURL === -1) {
         statusEl.textContent = `No se encontraron las columnas "${HEADER_APP}" y/o "${HEADER_URL}" en la planilla.`;
         return;
@@ -181,6 +187,8 @@ ACCESOS SOFTRAPPS
 
           const esStudioLink = /^https?:\/\//i.test(studioRaw);
 
+          const estadoRaw = cellValue(r, idxEstado) || EMPTY_PLACEHOLDER;
+          
       
           const app = escapeHtml(appRaw);
           const url = escapeHtml(urlRaw);
@@ -188,6 +196,7 @@ ACCESOS SOFTRAPPS
           const anio = escapeHtml(anioRaw);
           const album = escapeHtml(albumRaw);
           const studio = escapeHtml(studioRaw);
+          const estado = escapeHtml(estadoRaw);
           
 
           return `
@@ -201,6 +210,8 @@ ACCESOS SOFTRAPPS
               <span class="extra-field"><strong>A:</strong> ${esAlbumLink ? `<a href="${album}" target="_blank" rel="noopener">${album}</a>` : album}</span>
 
               <span class="extra-field"><strong>Studio.softr.io: </strong>${esStudioLink ? `<a href="${studio}" target="_blank" rel="noopener">abrir Editor App en Studio.softr.io/Applications/</a>` : studio}</span>
+
+              <span class="extra-field"><strong>Estado:</strong> ${estado}</span>
               
               <br>
             </div>`;
