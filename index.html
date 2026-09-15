@@ -115,7 +115,7 @@ ACCESOS SOFTRAPPS
 
   const HEADER_STUDIO = "Link Studio.softr.io";
 
-  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&gid=${GID}`;
+  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&gid=${GID}&headers=1`;
 
   const statusEl = document.getElementById("sheet-sync-status");
   const timeEl = document.getElementById("sheet-sync-time");
@@ -172,7 +172,7 @@ ACCESOS SOFTRAPPS
         .map(r => {
           const nombreRaw = cellValue(r, idxNombre);
           const linkRaw = cellValue(r, idxLink);
-          const bdRaw = cellValue(r, idxBd);
+          const bdRaw = cellValue(r, idxBD);
           const anioRaw = cellValue(r, idxAnio) || EMPTY_PLACEHOLDER;
           const albumRaw = cellValue(r, idxAlbum) || EMPTY_PLACEHOLDER;
           const esAlbumLink = /^https?:\/\//i.test(albumRaw);
