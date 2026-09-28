@@ -1,0 +1,613 @@
+https://docs.google.com/spreadsheets/d/
+/1YtQcFEQv6c0bxf5ue4Z94Ttojwb1fFMLCQAJpfzFJ4w/-edit?gid=0#gid=0
+<br><br><br>
+
+<a href="https://docs.google.com/spreadsheets/d/1YtQcFEQv6c0bxf5ue4Z94Ttojwb1fFMLCQAJpfzFJ4w" target="_blank" rel="noopener">Planilla fuente en Google Drive</a>
+<br><br><br>
+
+<a href="https://luchorcompartidos.github.io/lrfuturatablalink" target="_blank" rel="noopener">lrfuturatablalink</a>
+
+<br><br><br>
+ACCESOS SOFTRAPPS
+
+<br><br><br>
+
+
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SOFTRAPPS LRWebCatalog Dinámico</title>
+<style>
+  html, body {
+    margin: 0;
+    padding: 0;
+  }
+  body {
+    font-family: -apple-system, Segoe UI, Roboto, sans-serif;
+    background: #fafafa;
+  }
+
+  /* ===== Contenido escalable ===== */
+  #zoom-content {
+    padding: 30px 16px 60px 16px;
+    /* transform-origin se fija por JS según el navegador use zoom o transform */
+  }
+
+  #sheet-sync-container {
+    max-width: 700px;
+    margin: 0 auto;
+    background: #fff;
+    border: 1px solid #e5e5e5;
+    border-radius: 10px;
+    padding: 20px 24px;
+  }
+  #sheet-sync-container h1 {
+    font-size: 18px;
+    margin: 0 0 16px 0;
+  }
+  .sheet-sync-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+  }
+  .sheet-sync-header span {
+    font-size: 13px;
+    color: #666;
+  }
+  #sheet-sync-refresh {
+    font-size: 12px;
+    padding: 4px 10px;
+    border: 1px solid #ccc;
+    background: #f7f7f7;
+    border-radius: 6px;
+    cursor: pointer;
+  }
+  #sheet-sync-refresh:hover { background: #eee; }
+  #sheet-sync-count {
+    font-size: 13px;
+    color: #666;
+    margin-bottom: 8px;
+  }
+  #sheet-sync-status {
+    font-size: 13px;
+    color: #999;
+    margin-bottom: 8px;
+    min-height: 16px;
+  }
+  #sheet-sync-list .record {
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid #ddd;
+  }
+  #sheet-sync-list .record:last-child {
+    border-bottom: none;
+  }
+  #sheet-sync-list .record .record-title {
+    color: #1a2b1a;
+    font-weight: 600;
+    font-size: 15px;
+    display: block;
+  }
+  #sheet-sync-list .record .record-title a {
+    color: #1a73e8;
+    text-decoration: none;
+  }
+  #sheet-sync-list .record .record-title a:hover { text-decoration: underline; }
+  #sheet-sync-list .record .extra-field {
+    display: block;
+    margin-top: 4px;
+    font-size: 13px;
+    color: #444;
+  }
+  #sheet-sync-list .record .extra-field a {
+    font-weight: normal;
+    font-size: 13px;
+    color: #1a73e8;
+    text-decoration: none;
+  }
+  #sheet-sync-list .record .extra-field a:hover { text-decoration: underline; }
+
+  /* ===== Sección independiente de enlaces "tabLR" (fuera del catálogo) ===== */
+  #tablr-section {
+    max-width: 700px;
+    margin: 0 auto 20px auto;
+    display: none; /* se muestra por JS solo si hay contenido que mostrar */
+  }
+  #tablr-section.tablr-visible {
+    display: block;
+  }
+  #tablr-heading {
+    font-size: 15px;
+    font-weight: 700;
+    color: #1a2b1a;
+    margin: 0 0 8px 0;
+    display: none; /* se muestra por JS solo si hay al menos un enlace */
+  }
+  #tablr-heading.tablr-visible {
+    display: block;
+  }
+  #tablr-links .tablr-link {
+    display: block;
+    font-size: 14px;
+    color: #1a73e8;
+    text-decoration: none;
+    background: #fff;
+    border: 1px solid #e5e5e5;
+    border-radius: 8px;
+    padding: 8px 12px;
+    margin-bottom: 6px;
+  }
+  #tablr-links .tablr-link:last-child { margin-bottom: 0; }
+  #tablr-links .tablr-link:hover { text-decoration: underline; background: #f7faff; }
+  #tablr-status {
+    font-size: 12px;
+    color: #999;
+    margin-bottom: 6px;
+    min-height: 14px;
+  }
+  #tablr-status:empty { margin-bottom: 0; }
+
+  /* ===== Barra de control de zoom (NUNCA se escala) ===== */
+  #zoom-toolbar {
+    position: fixed;
+    top: 12px;
+    right: 12px;
+    z-index: 999999;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    background: #fff;
+    border: 1px solid #d0d0d0;
+    border-radius: 8px;
+    padding: 4px 6px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+    font-family: -apple-system, Segoe UI, Roboto, sans-serif;
+    /* aislado de cualquier zoom/transform del contenido */
+    zoom: 1 !important;
+    transform: none !important;
+  }
+  #zoom-toolbar button {
+    border: 1px solid #ccc;
+    background: #f7f7f7;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+    line-height: 1;
+    padding: 6px 9px;
+    color: #333;
+    min-width: 28px;
+  }
+  #zoom-toolbar button:hover { background: #eee; }
+  #zoom-toolbar button:active { background: #e2e2e2; }
+  #zoom-reset {
+    font-size: 15px;
+    padding: 6px 8px;
+  }
+  #zoom-level {
+    font-size: 12px;
+    font-weight: 600;
+    color: #333;
+    min-width: 42px;
+    text-align: center;
+    padding: 6px 4px;
+    border-radius: 6px;
+    background: #f0f0f0;
+    border: 1px solid #ddd;
+    cursor: pointer;
+  }
+  #zoom-level:hover { background: #e6e6e6; }
+  #zoom-level:active { background: #dcdcdc; }
+</style>
+</head>
+<body>
+
+<!-- Barra fija de zoom: Reset | − | 100% | + -->
+<div id="zoom-toolbar">
+  <button id="zoom-reset" title="Restablecer zoom a 100%">⟲</button>
+  <button id="zoom-out" title="Alejar">−</button>
+  <button id="zoom-level" title="Recargar sin caché (equivalente a Ctrl+F5)">100%</button>
+  <button id="zoom-in" title="Acercar">+</button>
+</div>
+
+<div id="zoom-content">
+  <div id="tablr-section">
+    <h2 id="tablr-heading">Tablas LR</h2>
+    <div id="tablr-status"></div>
+    <div id="tablr-links"></div>
+  </div>
+
+  <div id="sheet-sync-container">
+    <h1>SOFTR APPS WEB CATALOG Genérico</h1>
+    <div class="sheet-sync-header">
+      <span>Última sincronización: <span id="sheet-sync-time">—</span></span>
+      <button id="sheet-sync-refresh">Actualizar ahora</button>
+    </div>
+    <div id="sheet-sync-count"></div>
+    <div id="sheet-sync-status"></div>
+    <div id="sheet-sync-list"></div>
+  </div>
+</div>
+
+<script>
+(function () {
+  // ============================================================
+  //  CONTROL DE ZOOM RESPONSIVE
+  // ============================================================
+  // Usa la propiedad CSS "zoom" (nativa, reacomoda el layout real,
+  // igual que Ctrl + "+"/"-" del navegador). Nunca genera scroll
+  // horizontal: el contenido solo crece hacia abajo.
+  // Si el navegador no soporta "zoom" (Firefox viejo, etc.), se
+  // usa un fallback con transform: scale() ajustando el ancho
+  // para evitar el scroll horizontal.
+  const ZOOM_MIN = 70;
+  const ZOOM_MAX = 160;
+  const ZOOM_STEP = 10;
+  const ZOOM_DEFAULT = 100;
+  const STORAGE_KEY = "lrwebcatalog_zoom_level";
+
+  const zoomContent = document.getElementById("zoom-content");
+  const zoomLevelBtn = document.getElementById("zoom-level");
+  const zoomInBtn = document.getElementById("zoom-in");
+  const zoomOutBtn = document.getElementById("zoom-out");
+  const zoomResetBtn = document.getElementById("zoom-reset");
+
+  // Detección de soporte nativo de "zoom" (Chrome, Edge, Safari lo
+  // soportan; Firefox históricamente no).
+  const supportsNativeZoom = CSS.supports("zoom: 1.5");
+
+  function clamp(value) {
+    return Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, value));
+  }
+
+  function loadZoom() {
+    const stored = parseInt(localStorage.getItem(STORAGE_KEY), 10);
+    if (!isNaN(stored) && stored >= ZOOM_MIN && stored <= ZOOM_MAX) {
+      return stored;
+    }
+    return ZOOM_DEFAULT;
+  }
+
+  function applyZoom(level) {
+    const factor = level / 100;
+    if (supportsNativeZoom) {
+      zoomContent.style.zoom = String(factor);
+      zoomContent.style.transform = "";
+      zoomContent.style.width = "";
+    } else {
+      // Fallback con transform: scale(). Para que no aparezca scroll
+      // horizontal, compensamos el ancho en proporción inversa al
+      // factor de escala, ya que transform no reacomoda el layout.
+      zoomContent.style.transformOrigin = "top left";
+      zoomContent.style.transform = `scale(${factor})`;
+      zoomContent.style.width = `${100 / factor}%`;
+    }
+    zoomLevelBtn.textContent = `${level}%`;
+    zoomLevelBtn.dataset.level = String(level);
+    localStorage.setItem(STORAGE_KEY, String(level));
+  }
+
+  function changeZoom(delta) {
+    const current = parseInt(zoomLevelBtn.dataset.level, 10) || ZOOM_DEFAULT;
+    applyZoom(clamp(current + delta));
+  }
+
+  // El botón de porcentaje ("100%") NO solo resetea: fuerza una
+  // recarga sin caché, simulando Ctrl+F5. Se agrega un parámetro
+  // de timestamp para invalidar la caché y se usa location.replace
+  // para no dejar entrada extra en el historial.
+  function hardReload() {
+    const base = window.location.href.split("?")[0].split("#")[0];
+    window.location.replace(`${base}?_=${Date.now()}`);
+  }
+
+  zoomInBtn.addEventListener("click", () => changeZoom(ZOOM_STEP));
+  zoomOutBtn.addEventListener("click", () => changeZoom(-ZOOM_STEP));
+  zoomResetBtn.addEventListener("click", () => applyZoom(ZOOM_DEFAULT));
+  zoomLevelBtn.addEventListener("click", hardReload);
+
+  applyZoom(loadZoom());
+})();
+</script>
+
+<script>
+(function () {
+  // ============================================================
+  //  SINCRONIZACIÓN CON GOOGLE SHEETS
+  // ============================================================
+  // Esta app NO busca columnas por nombre. Toma las columnas que
+  // existan en la planilla, en el orden en que aparezcan, y decide
+  // cómo mostrar cada valor según su propio contenido (por ejemplo,
+  // si "parece" una URL o no). Si agregás, quitás o reordenás
+  // columnas en la planilla, la página se adapta sola sin tocar el
+  // código.
+  const SHEET_ID = "1YtQcFEQv6c0bxf5ue4Z94Ttojwb1fFMLCQAJpfzFJ4w";  const GID = "0";
+  const REFRESH_MS = 86400000; // vuelve a sincronizar cada 24 horas
+  const URL_REGEX = /^https?:\/\//i;
+
+  // "headers=1" le indica explícitamente a Google que la fila 1 es el
+  // encabezado. Sin este parámetro, si la planilla no lo detecta sola,
+  // los encabezados quedan vacíos y la fila 1 se cuela como si fuera
+  // el primer registro de datos.
+  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&gid=${GID}&headers=1`;
+
+  // ------------------------------------------------------------
+  // Listado de hojas ("Sheets") cuyo nombre contiene "tabLR".
+  //
+  // Se usa la Google Sheets API v4 (sheets.googleapis.com), que sí
+  // soporta CORS para lectura pública y es el método vigente para
+  // leer metadatos (como el título de cada pestaña) sin backend
+  // propio. Requiere una API key de Google Cloud con la "Google
+  // Sheets API" habilitada (no requiere OAuth para leer un archivo
+  // público; alcanza con restringir la key por dominio/referer).
+  //
+  // Por qué NO se usa el viejo feed "spreadsheets.google.com/feeds/
+  // worksheets/.../public/basic": esa API (v3, GData) está
+  // descontinuada, solo expone datos si el archivo fue
+  // explícitamente "Publicado en la web" (distinto de "Cualquiera
+  // con el enlace puede ver") y, aun así, en la mayoría de los
+  // casos el navegador bloquea la respuesta por falta del header
+  // CORS "Access-Control-Allow-Origin" — por eso siempre caía en
+  // el mensaje de error genérico.
+  // ------------------------------------------------------------
+  const SHEETS_API_KEY = "AIzaSyA2Zs9dcx7mUf5kdHeziIneA2c_7BqJlKY"; // reemplazar por tu key
+  const SHEETS_METADATA_URL =
+    `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}` +
+    `?key=${SHEETS_API_KEY}&fields=sheets.properties.title,sheets.properties.sheetId`;
+  const TABLR_KEYWORD = "tabLR";
+  // Estructura final del enlace generado para cada hoja "tabLR":
+  // https://luchorcompartidos.github.io/tablaN/index.html?sheetId=<SHEET_ID>&gid=<GID_de_la_hoja>
+  const TABLR_BASE_URL = "https://luchorcompartidos.github.io/tabla"; // + número secuencial (1, 2, 3...)
+
+  const statusEl = document.getElementById("sheet-sync-status");
+  const timeEl = document.getElementById("sheet-sync-time");
+  const listEl = document.getElementById("sheet-sync-list");
+  const countEl = document.getElementById("sheet-sync-count");
+  const tablrSectionEl = document.getElementById("tablr-section");
+  const tablrHeadingEl = document.getElementById("tablr-heading");
+  const tablrStatusEl = document.getElementById("tablr-status");
+  const tablrLinksEl = document.getElementById("tablr-links");
+
+  function escapeHtml(str) {
+    return String(str)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  // Devuelve el valor de una celda como texto, o "" si está vacía / no existe
+  function cellValue(row, colIndex) {
+    const cell = row.c[colIndex];
+    if (!cell || cell.v === null || cell.v === undefined) return "";
+    const str = String(cell.v).trim();
+    return str;
+  }
+
+  // Igual que cellValue, pero SIN recortar espacios. Se usa solo para la
+  // primera columna, porque ahí un espacio en blanco (" ") debe contar
+  // como "tiene un carácter" y no como celda vacía.
+  function cellValueRaw(row, colIndex) {
+    const cell = row.c[colIndex];
+    if (!cell || cell.v === null || cell.v === undefined) return "";
+    return String(cell.v);
+  }
+
+  function isUrl(value) {
+    return URL_REGEX.test(value);
+  }
+
+  // A partir de una URL, arma un texto de enlace legible sin depender del
+  // nombre de la columna: usa el dominio (sin "www."), que suele bastar
+  // para identificar de qué servicio se trata (spotify, youtube, etc).
+  function linkLabelFromUrl(value) {
+    try {
+      const host = new URL(value).hostname.replace(/^www\./, "");
+      return host;
+    } catch (e) {
+      return "Abrir enlace";
+    }
+  }
+
+  function formatValue(value) {
+    if (isUrl(value)) {
+      const safeUrl = escapeHtml(value);
+      const label = escapeHtml(linkLabelFromUrl(value));
+      return `<a href="${safeUrl}" target="_blank" rel="noopener">${label}</a>`;
+    }
+    return escapeHtml(value);
+  }
+
+  // Recorre TODAS las hojas ("Sheets") del archivo de Google Drive
+  // referenciado (no solo la hoja activa por GID) y, para cada una
+  // cuyo nombre contenga "tabLR", arma y lista un hipervínculo con
+  // la estructura: https://luchorcompartidos.github.io/<nombre de la hoja>
+  //
+  // Esta sección se muestra fuera y arriba del catálogo "LR WEB
+  // CATALOG Genérico". El contenedor completo (#tablr-section)
+  // solo se hace visible si hay algo que mostrar (enlaces o un
+  // mensaje de error/estado); el título "Tablas LR" solo se
+  // muestra si se encontró al menos un enlace.
+  async function syncTabLRLinks() {
+    tablrSectionEl.classList.add("tablr-visible");
+    tablrHeadingEl.classList.remove("tablr-visible");
+    tablrLinksEl.innerHTML = "";
+    tablrStatusEl.textContent = 'Buscando hojas "tabLR"...';
+
+    if (!SHEETS_API_KEY || SHEETS_API_KEY === "AIzaSyA2Zs9dcx7mUf5kdHeziIneA2c_7BqJlKY") {
+      tablrStatusEl.textContent =
+        'Falta configurar SHEETS_API_KEY (ver comentario en el código) para poder listar las hojas "tabLR".';
+      return;
+    }
+
+    try {
+      const res = await fetch(SHEETS_METADATA_URL);
+      if (!res.ok) {
+        // Se intenta leer el cuerpo JSON de error que devuelve Google
+        // (suele traer error.message con el motivo exacto: key
+        // inválida, referer no permitido, API no habilitada, etc.)
+        let detail = `HTTP ${res.status}`;
+        try {
+          const errJson = await res.json();
+          if (errJson && errJson.error && errJson.error.message) {
+            detail = errJson.error.message;
+          }
+        } catch (parseErr) {
+          // el cuerpo no era JSON; nos quedamos con el código HTTP
+        }
+        throw new Error(detail);
+      }
+      const json = await res.json();
+      const sheetsMeta = json.sheets || [];
+
+      // El título de cada pestaña viene en sheet.properties.title, y su
+      // GID real dentro del archivo (el mismo que usa la URL nativa de
+      // Google Sheets como "#gid=...") viene en sheet.properties.sheetId.
+      // El orden de "sheetsMeta" respeta el orden real de las pestañas
+      // en el archivo de Drive (así lo devuelve la Sheets API v4), y
+      // "sheetEntries" conserva ese mismo orden al filtrar solo las que
+      // contienen "tabLR". Por eso el número secuencial de la URL
+      // (tabla1, tabla2, tabla3...) se asigna según la posición dentro
+      // de este arreglo ya filtrado, no según el nombre de la hoja.
+      const sheetEntries = sheetsMeta
+        .map(sheet => ({
+          name: (sheet.properties && sheet.properties.title) ? sheet.properties.title.trim() : "",
+          gid: (sheet.properties && sheet.properties.sheetId !== undefined && sheet.properties.sheetId !== null)
+            ? String(sheet.properties.sheetId)
+            : ""
+        }))
+        .filter(entry => entry.name.length > 0 && entry.name.includes(TABLR_KEYWORD));
+
+      if (sheetEntries.length === 0) {
+        tablrStatusEl.textContent = "";
+        tablrSectionEl.classList.remove("tablr-visible");
+        return;
+      }
+
+      tablrHeadingEl.classList.add("tablr-visible");
+      tablrLinksEl.innerHTML = sheetEntries
+        .map((entry, index) => {
+          const sequentialNumber = index + 1; // tabla1, tabla2, tabla3...
+          // SHEET_ID identifica el archivo completo; gid identifica la
+          // hoja/pestaña puntual dentro de ese archivo. Ambos se pasan
+          // como parámetros de consulta en la URL final.
+          const href = escapeHtml(
+            `${TABLR_BASE_URL}${sequentialNumber}/index.html?sheetId=${SHEET_ID}&gid=${entry.gid}`
+          );
+          return `<a class="tablr-link" href="${href}" target="_blank" rel="noopener">${escapeHtml(entry.name)}</a>`;
+        })
+        .join("");
+      tablrStatusEl.textContent = "";
+    } catch (err) {
+      // Se muestra el motivo real del error (antes solo iba a la
+      // consola con un mensaje genérico en pantalla).
+      tablrStatusEl.textContent = `No se pudo obtener el listado de hojas "tabLR": ${err.message}`;
+      console.error(err);
+    }
+  }
+
+  async function syncSheet() {
+    statusEl.textContent = "Sincronizando...";
+    try {
+      const res = await fetch(url);
+      const text = await res.text();
+      // La respuesta viene envuelta como: google.visualization.Query.setResponse({...});
+      const json = JSON.parse(text.substring(text.indexOf("{"), text.lastIndexOf("}") + 1));
+      const rows = json.table.rows;
+      const cols = json.table.cols;
+
+      // Columnas a considerar, en el orden de la planilla:
+      // - Si el encabezado de la columna (Fila 1) NO tiene ningún carácter,
+      //   la columna entera se descarta (no se procesa en ninguna fila).
+      // - Si el encabezado tiene al menos 1 carácter, aunque sea un espacio
+      //   en blanco, la columna SÍ se considera. En ese caso, si el
+      //   encabezado queda vacío al recortar espacios, se usa "ColumnaX"
+      //   como nombre, donde X es el número de columna en la planilla
+      //   origen (1 = primera columna de la hoja, 2 = segunda, etc).
+      const activeColumns = cols
+        .map((c, i) => ({ sheetIndex: i, rawLabel: c.label || "" }))
+        .filter(c => c.rawLabel.length > 0)
+        .map(c => {
+          const trimmed = c.rawLabel.trim();
+          return {
+            sheetIndex: c.sheetIndex,
+            header: trimmed !== "" ? trimmed : `Columna${c.sheetIndex + 1}`
+          };
+        });
+
+      // Arma primero la lista de registros (filas con al menos un dato) para
+      // poder contarlos antes de convertirlos en HTML.
+      const recordFields = activeColumns.length === 0 ? [] : rows
+        .map(r => {
+          // La primera columna ACTIVA decide si el registro existe: si no
+          // tiene NINGÚN carácter se descarta. Si tiene al menos un
+          // carácter (aunque sea un espacio en blanco " "), el registro se
+          // toma y se muestra igual que cualquier otro (por eso acá NO se
+          // usa cellValue, que recorta espacios, sino cellValueRaw).
+          const firstColumn = activeColumns[0];
+          const firstColRaw = cellValueRaw(r, firstColumn.sheetIndex);
+          if (firstColRaw.length === 0) return null;
+
+          // El resto de las columnas activas sigue funcionando como antes:
+          // se descartan las que no tengan dato.
+          const restFields = activeColumns
+            .slice(1)
+            .map(col => ({ header: col.header, value: cellValue(r, col.sheetIndex) }))
+            .filter(f => f.value !== "");
+
+          return [{ header: firstColumn.header, value: firstColRaw }, ...restFields];
+        })
+        .filter(fields => fields !== null); // descarta solo las filas sin primera columna
+
+      countEl.textContent = `Actualizados: ${recordFields.length} Registros`;
+
+      listEl.innerHTML = recordFields
+        .map(fields => {
+          // La primera columna con dato de la fila se usa como título del
+          // registro (posición, no nombre). El resto se lista debajo.
+          const [titleField, ...restFields] = fields;
+
+          const titleHtml = isUrl(titleField.value)
+            ? `<a href="${escapeHtml(titleField.value)}" target="_blank" rel="noopener">${escapeHtml(titleField.value)}</a>`
+            : escapeHtml(titleField.value);
+
+          const restHtml = restFields
+            .map(f => `<span class="extra-field"><strong>${escapeHtml(f.header)}:</strong> ${formatValue(f.value)}</span>`)
+            .join("");
+
+          return `
+            <div class="record">
+              <span class="record-title">${titleHtml}</span>
+              ${restHtml}
+            </div>`;
+        })
+        .join("");
+
+      if (!listEl.innerHTML) {
+        listEl.innerHTML = '<p style="color:#999;font-size:14px;">No se encontraron registros.</p>';
+      }
+
+      statusEl.textContent = "";
+      timeEl.textContent = new Date().toLocaleTimeString();
+    } catch (err) {
+      statusEl.textContent = "No se pudo sincronizar. Verificá que la hoja sea pública ('cualquiera con el enlace').";
+      console.error(err);
+    }
+  }
+
+  function refreshAll() {
+    syncTabLRLinks();
+    syncSheet();
+  }
+
+  document.getElementById("sheet-sync-refresh").addEventListener("click", refreshAll);
+  refreshAll();
+  setInterval(refreshAll, REFRESH_MS);
+})();
+</script>
+
+</body>
+</html>
