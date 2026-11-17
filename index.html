@@ -19,6 +19,7 @@ ACCESOS SOFTRAPPS
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="app-version" content="v0.1.0">
 <title>SOFTRAPPS LRWebCatalog Dinámico</title>
 <style>
   html, body {
@@ -221,7 +222,7 @@ ACCESOS SOFTRAPPS
   </div>
 
   <div id="sheet-sync-container">
-    <h1>SOFTR APPS WEB CATALOG Genérico</h1>
+    <h1>SOFTR APPS WEB CATALOG Genérico <button id="verBtn" class="vs-ver" type="button">v—</button></h1>
     <div class="sheet-sync-header">
       <span>Última sincronización: <span id="sheet-sync-time">—</span></span>
       <button id="sheet-sync-refresh">Actualizar ahora</button>
@@ -658,6 +659,90 @@ ACCESOS SOFTRAPPS
   setInterval(refreshAll, REFRESH_MS);
 })();
 </script>
+
+<!-- ===== Versión (estándar caja de apps) — bloque autónomo =====
+     Requiere en el <head>: <meta name="app-version" content="vX.Y.Z">
+     y en el encabezado: <button id="verBtn" class="vs-ver" type="button">v—</button>
+     1) El número escrito en el HTML se ve siempre (sin conexión, Apps Script, caché vieja).
+     2) Fecha y Changelog desde las Releases de GitHub (sin conexión: última copia guardada).
+     3) Si GitHub tiene una versión más alta: aviso "Hay una versión nueva, recargá". -->
+<style>
+  .vs-ver{border:1px solid #d0d5dd;background:#fff;color:#555;font:600 12px system-ui,sans-serif;padding:3px 10px;border-radius:999px;cursor:pointer;vertical-align:middle}
+  .vs-ver.new{border-color:#d97706;color:#d97706}
+  .vs-upd{display:none;position:sticky;top:0;z-index:9998;align-items:center;justify-content:space-between;gap:10px;padding:9px 14px;background:#f59e0b;color:#1c1f26;font:14px system-ui,sans-serif}
+  .vs-upd.on{display:flex}
+  .vs-upd button,.vs-dlg .vs-acts button,.vs-dlg .vs-acts a{border:1px solid #c9ced6;border-radius:10px;padding:8px 13px;background:#fff;color:#1c1f26;font:14px system-ui,sans-serif;cursor:pointer;text-decoration:none}
+  .vs-upd button{border-color:#1c1f26;background:#1c1f26;color:#fff}
+  .vs-dlg{border:1px solid #d0d5dd;border-radius:16px;padding:20px;max-width:min(560px,92vw);width:100%;font:15px/1.45 system-ui,sans-serif;color:#1c1f26;background:#fff}
+  .vs-dlg h3{margin:0 0 8px}.vs-dlg .vs-mut{color:#6b7280}
+  .vs-dlg .vs-rels{max-height:60vh;overflow:auto}
+  .vs-dlg .vs-rel{border-top:1px solid #e5e7eb;padding:10px 0}.vs-dlg .vs-rel pre{white-space:pre-wrap;font:inherit;font-size:14px;color:#6b7280;margin:4px 0 0}
+  .vs-dlg .vs-acts{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end;margin-top:14px}
+  .vs-dlg .vs-acts .vs-pri{background:#4f46e5;border-color:#4f46e5;color:#fff}
+</style>
+<div class="vs-upd" id="vsUpd" role="status"><span id="vsUpdTxt">Hay una versión nueva, recargá.</span><button type="button" id="vsUpdBtn">Recargar</button></div>
+<dialog class="vs-dlg" id="vsDlg"></dialog>
+<script>
+(function(){
+  const REPO = "luchorcompartidos/softrapps";                       // usuario/repo de GitHub
+  const KEY  = "vs_rels_" + REPO;
+  const APP_VERSION = (document.querySelector('meta[name="app-version"]')||{}).content || "v—";
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  const fmt = s => new Date(s).toLocaleString("es-AR",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"});
+  const semv = t => (String(t).replace(/^v/,"").split(".").map(n=>parseInt(n)||0).concat([0,0,0])).slice(0,3);
+  const cmpV = (a,b) => { const x=semv(a), y=semv(b); for(let i=0;i<3;i++) if(x[i]!==y[i]) return y[i]-x[i]; return 0; };
+  let rels = null; try{ rels = JSON.parse(localStorage.getItem(KEY)||"null"); }catch(e){}
+  // Si el diálogo quedó fuera del <body> (bloque pegado al final), lo movemos
+  [$("vsUpd"),$("vsDlg")].forEach(el=>{ if(el && el.parentNode!==document.body) document.body.appendChild(el); });
+  document.body.insertBefore($("vsUpd"), document.body.firstChild);
+  const ultima = () => rels && rels[0];
+  const hayNueva = () => !!(ultima() && APP_VERSION!=="v—" && cmpV(ultima().tag, APP_VERSION) < 0);
+  function show(){
+    const b = $("verBtn"), n = hayNueva();
+    if(b){ b.textContent = APP_VERSION + (n?" ⬆":""); b.classList.toggle("new", n); b.title = n ? "Hay una versión nueva: "+ultima().tag : "Versión"; }
+    $("vsUpd").classList.toggle("on", n);
+    if(n) $("vsUpdTxt").textContent = `Hay una versión nueva (${ultima().tag}), recargá.`;
+  }
+  async function load(){
+    try{
+      const r = await fetch(`https://api.github.com/repos/${REPO}/releases?per_page=100`,{headers:{Accept:"application/vnd.github+json"},cache:"no-store"});
+      if(!r.ok) return;
+      rels = (await r.json()).filter(x=>!x.draft && !x.prerelease).map(x=>{
+        const f = (x.assets||[]).map(a=>a.updated_at).filter(Boolean).sort();
+        return { tag:x.tag_name, date:f.length?f[f.length-1]:(x.published_at||x.created_at), deArchivo:f.length>0, body:x.body||"" };
+      }).sort((a,b)=>cmpV(a.tag,b.tag));
+      try{ localStorage.setItem(KEY, JSON.stringify(rels)); }catch(e){}
+      show();
+    }catch(e){}
+  }
+  function recargar(){ const u = new URL(location.href); u.searchParams.set("v", Date.now()); location.replace(u); }
+  function dlg(html){
+    const d = $("vsDlg"); d.innerHTML = html;
+    d.querySelectorAll("[data-x]").forEach(b=>b.onclick=()=>d.close());
+    if(!d.open) d.showModal(); return d;
+  }
+  function openVer(){
+    const r = (rels||[]).find(x=>x.tag===APP_VERSION), n = hayNueva();
+    const fecha = r ? (r.deArchivo?"Archivos actualizados el ":"Publicada el ")+"<b>"+fmt(r.date)+"</b>"
+                    : rels ? "Esta versión todavía no figura en las Releases de GitHub." : "Fecha no disponible (requiere conexión).";
+    const d = dlg(`<h3>Versión ${esc(APP_VERSION)}</h3><p class="vs-mut">${fecha}</p>${n?`<p><b>Hay una versión nueva: ${esc(ultima().tag)}.</b></p>`:""}
+      <div class="vs-acts">${n?'<button class="vs-pri" id="vsRec" type="button">↻ Recargar</button>':""}<button ${n?"":'class="vs-pri"'} id="vsLog" type="button">📋 Changelog</button><button data-x type="button">Cerrar</button></div>`);
+    d.querySelector("#vsLog").onclick = openLog;
+    const rb = d.querySelector("#vsRec"); if(rb) rb.onclick = recargar;
+  }
+  function openLog(){
+    const list = (rels||[]).map(r=>`<div class="vs-rel"><b>${esc(r.tag)}</b>${r.tag===APP_VERSION?' <span class="vs-mut">(la que estás usando)</span>':""} · <span class="vs-mut">${fmt(r.date)}</span>${r.body?`<pre>${esc(r.body)}</pre>`:""}</div>`).join("");
+    dlg(`<h3>Changelog</h3><div class="vs-rels">${list||'<p class="vs-mut">Sin datos todavía (requiere conexión).</p>'}</div>
+      <div class="vs-acts"><a href="https://github.com/${REPO}/releases" target="_blank" rel="noopener">Ver Releases en GitHub ↗</a><button data-x type="button">Cerrar</button></div>`);
+  }
+  $("vsDlg").addEventListener("click", e=>{ if(e.target.id==="vsDlg") e.target.close(); });
+  if($("verBtn")) $("verBtn").addEventListener("click", openVer);
+  $("vsUpdBtn").addEventListener("click", recargar);
+  show(); load();
+})();
+</script>
+<!-- ===== fin bloque Versión ===== -->
 
 </body>
 </html>

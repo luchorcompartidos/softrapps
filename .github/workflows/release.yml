@@ -1,0 +1,129 @@
+name: Tag y Release automáticos
+
+# Tipo de Release según el mensaje del commit (push a main). Siempre tres números (SemVer):
+#   "[major]"  v0.9.2 -> v1.0.0
+#   "[minor]"  v0.3.1 -> v0.4.0
+#   "[patch]"  v0.3.0 -> v0.3.1 -> v0.3.2 (las versiones viejas v0.1, v0.2 se ordenan igual)
+# Estándar de versión: el número va escrito en el HTML
+#   <meta name="app-version" content="vX.Y.Z">
+# Este flujo compara ese número con el que calcula y avisa si no coinciden.
+#   sin etiqueta (o "[skip release]"): NO crea tag ni Release; deja un aviso
+#   en la corrida con el link para crearlo a mano si se quiere.
+# Creación a mano: Actions > "Tag y Release automáticos" > Run workflow > elegir tipo.
+# Después de v0.9 sigue v0.10 (estándar semántico), salvo que uses [major].
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      tipo:
+        description: "Tipo de Release a crear sobre el último commit de main"
+        required: true
+        default: patch
+        type: choice
+        options: [patch, minor, major]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+env:
+  # Archivo HTML con <meta name="app-version"> y archivos a adjuntar a cada Release.
+  APP_FILE: "index.html"
+  ADJUNTOS: "index.html"
+  # Planilla publicada en la web como .xlsx (vacío = no se adjunta).
+  PLANILLA_URL: ""
+  PLANILLA_NOMBRE: "planilla.xlsx"
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Determinar tipo de Release
+        id: tipo
+        env:
+          EVENTO: ${{ github.event_name }}
+          TIPO_MANUAL: ${{ inputs.tipo }}
+          MSG: ${{ github.event.head_commit.message }}
+          LINK: ${{ github.server_url }}/${{ github.repository }}/actions/workflows/release.yml
+        run: |
+          if [ "$EVENTO" = "workflow_dispatch" ]; then
+            tipo="$TIPO_MANUAL"
+          elif grep -q '\[skip release\]' <<< "$MSG"; then
+            tipo=""
+          elif grep -q '\[major\]' <<< "$MSG"; then tipo="major"
+          elif grep -q '\[minor\]' <<< "$MSG"; then tipo="minor"
+          elif grep -q '\[patch\]' <<< "$MSG"; then tipo="patch"
+          else
+            tipo=""
+          fi
+          echo "tipo=$tipo" >> "$GITHUB_OUTPUT"
+          if [ -z "$tipo" ]; then
+            echo "::warning title=Sin Release::Este push no indica tipo de Release ([major], [minor] o [patch]). El sitio se publica igual, pero NO se creó tag ni Release. Si querés crearlo: Actions > Tag y Release automáticos > Run workflow > elegir tipo."
+            {
+              echo "## ⚠️ Push sin Release"
+              echo
+              echo "El mensaje del commit no indica tipo de Release, así que **no se creó tag ni Release**. El sitio se publica igual."
+              echo
+              echo "**¿Querés avanzar así?** No hace falta hacer nada."
+              echo
+              echo "**¿Preferís crear una versión de este cambio?** Entrá a [Tag y Release automáticos]($LINK), tocá **Run workflow** y elegí el tipo (patch, minor o major)."
+              echo
+              echo "Para la próxima, agregá \`[patch]\`, \`[minor]\` o \`[major]\` al mensaje del commit."
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.tipo.outputs.tipo != ''
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Calcular siguiente versión y crear tag + Release
+        if: steps.tipo.outputs.tipo != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TIPO: ${{ steps.tipo.outputs.tipo }}
+        run: |
+          last=$(git tag -l 'v*' | grep -E '^v[0-9]+\.[0-9]+(\.[0-9]+)?$' | sort -V | tail -1)
+          if [ -z "$last" ]; then
+            next="v0.1.0"
+          else
+            IFS=. read -r X Y Z <<< "${last#v}"
+            case "$TIPO" in
+              major) next="v$((X+1)).0.0" ;;
+              minor) next="v$X.$((Y+1)).0" ;;
+              patch) next="v$X.$Y.$(( ${Z:-0} + 1 ))" ;;
+            esac
+          fi
+          if git rev-parse -q --verify "refs/tags/$next" >/dev/null; then
+            echo "::error::La versión $next ya existe. Usá el flujo 'Reemplazar versión' si querés pisarla."
+            exit 1
+          fi
+          enhtml=$(grep -oE '<meta name="app-version" content="v[0-9.]+"' "$APP_FILE" | grep -oE 'v[0-9.]+' || true)
+          if [ -z "$enhtml" ]; then
+            echo "::warning title=Versión en el HTML::$APP_FILE no tiene <meta name=\"app-version\">. El encabezado no va a mostrar el número sin conexión."
+          elif [ "$enhtml" != "$next" ]; then
+            echo "::warning title=Versión en el HTML::$APP_FILE dice $enhtml pero esta Release es $next. La app va a mostrar el aviso de versión nueva."
+            echo "> ⚠️ El HTML dice **$enhtml** y la Release es **$next**." >> "$GITHUB_STEP_SUMMARY"
+          fi
+          sha=$(git rev-parse HEAD)
+          subject=$(git log -1 --pretty=%s)
+          echo "Última: ${last:-ninguna} -> Nueva: $next ($TIPO)"
+          files="$ADJUNTOS"
+          if [ -n "$PLANILLA_URL" ]; then
+            if curl -fsSL "$PLANILLA_URL" -o "$PLANILLA_NOMBRE" && head -c 2 "$PLANILLA_NOMBRE" | grep -q PK; then
+              files="$files $PLANILLA_NOMBRE"
+            else
+              echo "::warning::No se pudo descargar la planilla publicada; el Release queda sin la planilla."
+            fi
+          fi
+          git tag "$next" "$sha"
+          git push origin "$next"
+          gh release create "$next" --title "$next" --verify-tag \
+            --notes "Deploy ($TIPO): $subject (commit ${sha::7})" $files
+          echo "## ✅ Release $next ($TIPO) creado" >> "$GITHUB_STEP_SUMMARY"
