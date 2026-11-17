@@ -26,18 +26,23 @@ on:
 
 permissions:
   contents: write
+  actions: write
 
 concurrency:
   group: release
   cancel-in-progress: false
 
 env:
-  # Archivo HTML con <meta name="app-version"> y archivos a adjuntar a cada Release.
+  # Archivos HTML con <meta name="app-version"> (separados por espacio) y archivos a adjuntar a cada Release.
   APP_FILE: "index.html"
   ADJUNTOS: "index.html"
   # Planilla publicada en la web como .xlsx (vacío = no se adjunta).
   PLANILLA_URL: ""
   PLANILLA_NOMBRE: "planilla.xlsx"
+  # Flujo de publicación a lanzar después de crear la Release (vacío = ninguno).
+  # Hace falta cuando GitHub Pages se publica solo "al publicar una Release": las Releases
+  # creadas por este flujo no disparan otros flujos por sí solas.
+  DISPARAR_FLUJO: ""
 
 jobs:
   release:
@@ -104,13 +109,24 @@ jobs:
             echo "::error::La versión $next ya existe. Usá el flujo 'Reemplazar versión' si querés pisarla."
             exit 1
           fi
-          enhtml=$(grep -oE '<meta name="app-version" content="v[0-9.]+"' "$APP_FILE" | grep -oE 'v[0-9.]+' || true)
-          if [ -z "$enhtml" ]; then
-            echo "::warning title=Versión en el HTML::$APP_FILE no tiene <meta name=\"app-version\">. El encabezado no va a mostrar el número sin conexión."
-          elif [ "$enhtml" != "$next" ]; then
-            echo "::warning title=Versión en el HTML::$APP_FILE dice $enhtml pero esta Release es $next. La app va a mostrar el aviso de versión nueva."
-            echo "> ⚠️ El HTML dice **$enhtml** y la Release es **$next**." >> "$GITHUB_STEP_SUMMARY"
+          # Si el número escrito en el HTML es más alto que el calculado, manda el del HTML
+          # (sirve para la primera Release de una app que ya traía su propia numeración).
+          primero=${APP_FILE%% *}
+          h=$(grep -oE '<meta name="app-version" content="v[0-9]+\.[0-9]+\.[0-9]+"' "$primero" | grep -oE 'v[0-9.]+' || true)
+          if [ -n "$h" ] && [ "$h" != "$next" ] && [ "$(printf '%s\n%s\n' "$next" "$h" | sort -V | tail -1)" = "$h" ] \
+             && ! git rev-parse -q --verify "refs/tags/$h" >/dev/null; then
+            echo "El HTML dice $h, más alto que $next: se usa $h."
+            next="$h"
           fi
+          for f in $APP_FILE; do
+            enhtml=$(grep -oE '<meta name="app-version" content="v[0-9.]+"' "$f" | grep -oE 'v[0-9.]+' || true)
+            if [ -z "$enhtml" ]; then
+              echo "::warning title=Versión en el HTML::$f no tiene <meta name=\"app-version\">. El encabezado no va a mostrar el número sin conexión."
+            elif [ "$enhtml" != "$next" ]; then
+              echo "::warning title=Versión en el HTML::$f dice $enhtml pero esta Release es $next. La app va a mostrar el aviso de versión nueva."
+              echo "> ⚠️ $f dice **$enhtml** y la Release es **$next**." >> "$GITHUB_STEP_SUMMARY"
+            fi
+          done
           sha=$(git rev-parse HEAD)
           subject=$(git log -1 --pretty=%s)
           echo "Última: ${last:-ninguna} -> Nueva: $next ($TIPO)"
@@ -127,3 +143,6 @@ jobs:
           gh release create "$next" --title "$next" --verify-tag \
             --notes "Deploy ($TIPO): $subject (commit ${sha::7})" $files
           echo "## ✅ Release $next ($TIPO) creado" >> "$GITHUB_STEP_SUMMARY"
+          if [ -n "$DISPARAR_FLUJO" ]; then
+            gh workflow run "$DISPARAR_FLUJO" --ref main && echo "Publicación lanzada ($DISPARAR_FLUJO)." >> "$GITHUB_STEP_SUMMARY"
+          fi

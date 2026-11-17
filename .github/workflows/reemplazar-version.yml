@@ -38,11 +38,13 @@ on:
 
 permissions:
   contents: write
+  actions: write
 
 env:
   # Planilla publicada en la web como .xlsx (Todo el documento).
   PLANILLA_URL: ""
   PLANILLA_NOMBRE: "planilla.xlsx"
+  DISPARAR_FLUJO: ""
 
 concurrency:
   group: release
@@ -120,3 +122,4 @@ jobs:
           git push origin "$V"
           gh release create "$V" --title "$V" --notes "$NOTAS" --verify-tag $ADJ
           echo "Listo: $V apunta a ${sha::7}."
+          if [ -n "$DISPARAR_FLUJO" ]; then gh workflow run "$DISPARAR_FLUJO" --ref "${{ inputs.rama }}"; fi
