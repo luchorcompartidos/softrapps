@@ -19,7 +19,7 @@ ACCESOS SOFTRAPPS
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="app-version" content="v0.1.0">
+<meta name="app-version" content="v0.1.1">
 <title>SOFTRAPPS LRWebCatalog Dinámico</title>
 <style>
   html, body {
@@ -663,12 +663,15 @@ ACCESOS SOFTRAPPS
 <!-- ===== Versión (estándar caja de apps) — bloque autónomo =====
      Requiere en el <head>: <meta name="app-version" content="vX.Y.Z">
      y en el encabezado: <button id="verBtn" class="vs-ver" type="button">v—</button>
+     (o, si la app ya muestra su propio texto de versión, marcar ese elemento con data-vs-open:
+      al tocarlo abre el diálogo y no se le cambia el texto).
      1) El número escrito en el HTML se ve siempre (sin conexión, Apps Script, caché vieja).
      2) Fecha y Changelog desde las Releases de GitHub (sin conexión: última copia guardada).
      3) Si GitHub tiene una versión más alta: aviso "Hay una versión nueva, recargá". -->
 <style>
   .vs-ver{border:1px solid #d0d5dd;background:#fff;color:#555;font:600 12px system-ui,sans-serif;padding:3px 10px;border-radius:999px;cursor:pointer;vertical-align:middle}
-  .vs-ver.new{border-color:#d97706;color:#d97706}
+  .vs-ver.new,[data-vs-open].new{border-color:#d97706;color:#d97706}
+  [data-vs-open]{cursor:pointer}
   .vs-upd{display:none;position:sticky;top:0;z-index:9998;align-items:center;justify-content:space-between;gap:10px;padding:9px 14px;background:#f59e0b;color:#1c1f26;font:14px system-ui,sans-serif}
   .vs-upd.on{display:flex}
   .vs-upd button,.vs-dlg .vs-acts button,.vs-dlg .vs-acts a{border:1px solid #c9ced6;border-radius:10px;padding:8px 13px;background:#fff;color:#1c1f26;font:14px system-ui,sans-serif;cursor:pointer;text-decoration:none}
@@ -678,6 +681,7 @@ ACCESOS SOFTRAPPS
   .vs-dlg .vs-rels{max-height:60vh;overflow:auto}
   .vs-dlg .vs-rel{border-top:1px solid #e5e7eb;padding:10px 0}.vs-dlg .vs-rel pre{white-space:pre-wrap;font:inherit;font-size:14px;color:#6b7280;margin:4px 0 0}
   .vs-dlg .vs-acts{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end;margin-top:14px}
+  @media print{.vs-ver,.vs-upd,.vs-dlg{display:none!important}}
   .vs-dlg .vs-acts .vs-pri{background:#4f46e5;border-color:#4f46e5;color:#fff}
 </style>
 <div class="vs-upd" id="vsUpd" role="status"><span id="vsUpdTxt">Hay una versión nueva, recargá.</span><button type="button" id="vsUpdBtn">Recargar</button></div>
@@ -685,6 +689,7 @@ ACCESOS SOFTRAPPS
 <script>
 (function(){
   const REPO = "luchorcompartidos/softrapps";                       // usuario/repo de GitHub
+  const LOG_FN = "";                   // función propia de Changelog de la app (vacío = usar el de GitHub)
   const KEY  = "vs_rels_" + REPO;
   const APP_VERSION = (document.querySelector('meta[name="app-version"]')||{}).content || "v—";
   const $ = id => document.getElementById(id);
@@ -693,53 +698,76 @@ ACCESOS SOFTRAPPS
   const semv = t => (String(t).replace(/^v/,"").split(".").map(n=>parseInt(n)||0).concat([0,0,0])).slice(0,3);
   const cmpV = (a,b) => { const x=semv(a), y=semv(b); for(let i=0;i<3;i++) if(x[i]!==y[i]) return y[i]-x[i]; return 0; };
   let rels = null; try{ rels = JSON.parse(localStorage.getItem(KEY)||"null"); }catch(e){}
+  // Estado de la última consulta a GitHub: así el diálogo distingue "no está publicada" de "no se pudo consultar"
+  let relsAt = 0; try{ relsAt = +localStorage.getItem(KEY+"_t") || 0; }catch(e){}
+  let lastFail = false, loading = null;
   // Si el diálogo quedó fuera del <body> (bloque pegado al final), lo movemos
   [$("vsUpd"),$("vsDlg")].forEach(el=>{ if(el && el.parentNode!==document.body) document.body.appendChild(el); });
   document.body.insertBefore($("vsUpd"), document.body.firstChild);
+  // Dentro de Apps Script la app sale de la copia del script: recargar no alcanza, hay que actualizarlo.
+  const GAS = !!(window.google && window.google.script && window.google.script.run);
+  const REL_URL = `https://github.com/${REPO}/releases`;
+  if(GAS){ const ub=$("vsUpdBtn"); ub.textContent = "Ver Releases"; }
   const ultima = () => rels && rels[0];
   const hayNueva = () => !!(ultima() && APP_VERSION!=="v—" && cmpV(ultima().tag, APP_VERSION) < 0);
   function show(){
     const b = $("verBtn"), n = hayNueva();
     if(b){ b.textContent = APP_VERSION + (n?" ⬆":""); b.classList.toggle("new", n); b.title = n ? "Hay una versión nueva: "+ultima().tag : "Versión"; }
+    document.querySelectorAll("[data-vs-open]").forEach(el=>{ el.classList.toggle("new", n); if(n) el.title = "Hay una versión nueva: "+ultima().tag; });
     $("vsUpd").classList.toggle("on", n);
-    if(n) $("vsUpdTxt").textContent = `Hay una versión nueva (${ultima().tag}), recargá.`;
+    if(n) $("vsUpdTxt").textContent = GAS ? `Hay una versión nueva (${ultima().tag}): actualizá el script de Apps Script.`
+                                          : `Hay una versión nueva (${ultima().tag}), recargá.`;
   }
-  async function load(){
+  function load(){ if(!loading) loading = doLoad().finally(()=>{ loading = null; }); return loading; }
+  async function doLoad(){
     try{
       const r = await fetch(`https://api.github.com/repos/${REPO}/releases?per_page=100`,{headers:{Accept:"application/vnd.github+json"},cache:"no-store"});
-      if(!r.ok) return;
+      if(!r.ok){ lastFail = true; return; }
+      lastFail = false; relsAt = Date.now(); try{ localStorage.setItem(KEY+"_t", String(relsAt)); }catch(e){}
       rels = (await r.json()).filter(x=>!x.draft && !x.prerelease).map(x=>{
         const f = (x.assets||[]).map(a=>a.updated_at).filter(Boolean).sort();
         return { tag:x.tag_name, date:f.length?f[f.length-1]:(x.published_at||x.created_at), deArchivo:f.length>0, body:x.body||"" };
       }).sort((a,b)=>cmpV(a.tag,b.tag));
       try{ localStorage.setItem(KEY, JSON.stringify(rels)); }catch(e){}
       show();
-    }catch(e){}
+    }catch(e){ lastFail = true; }
   }
-  function recargar(){ const u = new URL(location.href); u.searchParams.set("v", Date.now()); location.replace(u); }
+  function recargar(){ if(GAS){ window.open(REL_URL, "_blank", "noopener"); return; } const u = new URL(location.href); u.searchParams.set("v", Date.now()); location.replace(u); }
   function dlg(html){
     const d = $("vsDlg"); d.innerHTML = html;
     d.querySelectorAll("[data-x]").forEach(b=>b.onclick=()=>d.close());
     if(!d.open) d.showModal(); return d;
   }
+  let reintento = false;
   function openVer(){
     const r = (rels||[]).find(x=>x.tag===APP_VERSION), n = hayNueva();
+    const hace = relsAt ? ` (información de hace ${Math.max(1, Math.round((Date.now()-relsAt)/60000))} min)` : "";
+    // Si la lista guardada no tiene esta versión, se vuelve a consultar GitHub antes de concluir nada
+    if(!r && !reintento && navigator.onLine !== false){ reintento = true; dlg(`<h3>Versión ${esc(APP_VERSION)}</h3><p class="vs-mut">Consultando GitHub…</p>`); load().then(()=>{ if($("vsDlg").open) openVer(); reintento = false; }); return; }
     const fecha = r ? (r.deArchivo?"Archivos actualizados el ":"Publicada el ")+"<b>"+fmt(r.date)+"</b>"
-                    : rels ? "Esta versión todavía no figura en las Releases de GitHub." : "Fecha no disponible (requiere conexión).";
-    const d = dlg(`<h3>Versión ${esc(APP_VERSION)}</h3><p class="vs-mut">${fecha}</p>${n?`<p><b>Hay una versión nueva: ${esc(ultima().tag)}.</b></p>`:""}
-      <div class="vs-acts">${n?'<button class="vs-pri" id="vsRec" type="button">↻ Recargar</button>':""}<button ${n?"":'class="vs-pri"'} id="vsLog" type="button">📋 Changelog</button><button data-x type="button">Cerrar</button></div>`);
-    d.querySelector("#vsLog").onclick = openLog;
+                    : navigator.onLine === false ? `Sin conexión: no se puede consultar GitHub ahora${rels ? hace : ""}.`
+                    : lastFail ? `No se pudo consultar GitHub (puede ser un límite de consultas seguidas). Probá de nuevo en unos minutos${rels ? hace : ""}.`
+                    : rels ? "Esta versión todavía no figura en las Releases de GitHub. Se publica unos segundos después de cada entrega: probá de nuevo en un minuto."
+                    : "Fecha no disponible (requiere conexión).";
+    const d = dlg(`<h3>Versión ${esc(APP_VERSION)}</h3><p class="vs-mut">${fecha}</p>${n?`<p><b>Hay una versión nueva: ${esc(ultima().tag)}.</b>${GAS?" Para usarla, actualizá el script de Apps Script.":""}</p>`:""}
+      <div class="vs-acts">${n?`<button class="vs-pri" id="vsRec" type="button">${GAS?"Ver Releases":"↻ Recargar"}</button>`:""}<button ${n?"":'class="vs-pri"'} id="vsLog" type="button">📋 Changelog</button><button data-x type="button">Cerrar</button></div>`);
+    d.querySelector("#vsLog").onclick = () => { if(LOG_FN && typeof window[LOG_FN]==="function"){ d.close(); window[LOG_FN](); } else openLog(); };
     const rb = d.querySelector("#vsRec"); if(rb) rb.onclick = recargar;
   }
   function openLog(){
     const list = (rels||[]).map(r=>`<div class="vs-rel"><b>${esc(r.tag)}</b>${r.tag===APP_VERSION?' <span class="vs-mut">(la que estás usando)</span>':""} · <span class="vs-mut">${fmt(r.date)}</span>${r.body?`<pre>${esc(r.body)}</pre>`:""}</div>`).join("");
     dlg(`<h3>Changelog</h3><div class="vs-rels">${list||'<p class="vs-mut">Sin datos todavía (requiere conexión).</p>'}</div>
-      <div class="vs-acts"><a href="https://github.com/${REPO}/releases" target="_blank" rel="noopener">Ver Releases en GitHub ↗</a><button data-x type="button">Cerrar</button></div>`);
+      <div class="vs-acts"><a href="${REL_URL}" target="_blank" rel="noopener">Ver Releases en GitHub ↗</a><button data-x type="button">Cerrar</button></div>`);
   }
   $("vsDlg").addEventListener("click", e=>{ if(e.target.id==="vsDlg") e.target.close(); });
   if($("verBtn")) $("verBtn").addEventListener("click", openVer);
+  document.querySelectorAll("[data-vs-open]").forEach(el=>el.addEventListener("click", openVer));
+  window.VS = { abrir: openVer, version: APP_VERSION, hayNueva };
   $("vsUpdBtn").addEventListener("click", recargar);
   show(); load();
+  // Se vuelve a consultar al volver a la app, si la información tiene más de 10 minutos
+  document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState==="visible" && Date.now()-relsAt > 600000) load(); });
+  window.addEventListener("online", ()=>load());
 })();
 </script>
 <!-- ===== fin bloque Versión ===== -->
